@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Intl example</title>
+</head>
+<body>
+<h1>Intl example</h1>
+<datalist id="locales">
+  <option>pl-PL</option>
+  <option>en-GB</option>
+  <option>en-US</option>
+  <option>de</option>
+  <option>hi</option>
+</datalist>
+<article>
+  <h2>Collator example</h2>
+  <label for="collator-locale">Locale</label>
+  <input list="locales" type="text" id="collator-locale">
+  <br>
+  <button id="collator-sort">Sort</button>
+  <pre id="collator-result"></pre>
+  <br>
+</article>
+<article>
+  <h2>DateTimeFormat example</h2>
+  <label for="datetime-format-date">Date</label>
+  <input id="datetime-format-date" type="datetime-local">
+  <br>
+  <label for="datetime-format-locale">Locale</label>
+  <input list="locales" type="text" id="datetime-format-locale">
+  <br>
+  <button id="datetime-format-transform-date">Transform date</button>
+  <pre id="datetime-format-transform-date-result"></pre>
+  <br>
+</article>
+<article>
+  <h2>DisplayNames example</h2>
+  <label for="display-names-locale">Locale</label>
+  <input list="locales" type="text" id="display-names-locale">
+  <br>
+  <button id="display-names-translate">Translate countries</button>
+  <details>
+    <summary>Show EU countries with languages and currencies</summary>
+    <table id="display-names-table">
+      <thead>
+      <tr>
+        <th>Country</th>
+        <th>Languages</th>
+        <th>Currencies</th>
+      </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="3">Click button to see translated data</td>
+        </tr>
+      </tbody>
+    </table>
+  </details>
+</article>
+<article>
+  <h2>RelativeTimeFormat example</h2>
+  <label for="relative-time-date">Date</label>
+  <input id="relative-time-date" type="datetime-local">
+  <br>
+  <label for="relative-time-locale">Locale</label>
+  <input list="locales" type="text" id="relative-time-locale">
+  <br>
+  <button id="relative-time-transform">Transform to relative</button>
+  <pre id="relative-time-transform-result"></pre>
+</article>
+<script>
+  const initCollatorExample = () => {
+    const arrayToSort = ['aa', 'ab', 'ąa', 'ba'];
+
+    document.querySelector('#collator-result').innerHTML = JSON.stringify(arrayToSort);
+
+    document.querySelector('#collator-sort').addEventListener('click', () => {
+      const localArrayToSort = [...arrayToSort]; // sort modifies array instead of returning new array
+      const locale = document.querySelector('#collator-locale').value;
+      const compare = locale? new Intl.Collator(locale).compare : undefined;
+      localArrayToSort.sort(compare);
+      document.querySelector('#collator-result').innerHTML = JSON.stringify(localArrayToSort);
+    });
+  }
+
+  const initDateFormatExample = () => {
+    document.querySelector('#datetime-format-transform-date').addEventListener('click', () => {
+      const date = new Date(document.querySelector('#datetime-format-date').value);
+      const locale = document.querySelector('#datetime-format-locale').value;
+      const dateTimeFormat = new Intl.DateTimeFormat(locale, {dateStyle: 'full', timeStyle: 'short'});
+      const formatted = dateTimeFormat.format(date);
+      document.querySelector('#datetime-format-transform-date-result').innerHTML = formatted;
+    });
+  }
+
+  const initDisplayNamesExample = async () => {
+    const localStorageKey = 'intl-example-data';
+    const dataFromLocalStorage = localStorage.getItem(localStorageKey);
+    let data = dataFromLocalStorage ? JSON.parse(dataFromLocalStorage) : null;
+    if (!data) {
+      const response = await fetch('https://restcountries.eu/rest/v2/regionalbloc/eu');
+      const body = await response.json();
+      data = body.map(el =>
+        ({
+          code: el.alpha2Code,
+          languages: el.languages.map(el => el.iso639_1),
+          currencies: el.currencies.map(el => el.code),
+        })
+      );
+      localStorage.setItem(localStorageKey, JSON.stringify(data));
+    }
+    document.querySelector('#display-names-translate').addEventListener('click', () => {
+      const locale = document.querySelector('#display-names-locale').value;
+      const namesTranslator = new Intl.DisplayNames(locale, { type: 'region' });
+      const languageTranslator = new Intl.DisplayNames(locale, { type: 'language' });
+      const currencyTranslator = new Intl.DisplayNames(locale, { type: 'currency' });
+      const tableRowsStr = data.map(el => {
+        const languages = el.languages.map(el => {
+          try {
+            return languageTranslator.of(el);
+          }
+          catch (e) {
+            return '';
+          }
+        }).join(',');
+        const currencies = el.currencies.map(el => {
+          try {
+            return currencyTranslator.of(el);
+          }
+          catch (e) {
+            return '';
+          }
+        }).join(',');
+        return (
+          `
+            <tr>
+              <td>${namesTranslator.of(el.code)}</td>
+              <td>${languages}</td>
+              <td>${currencies}</td>
+            </tr>
+            `
+        );
+      }).join('');
+      document.querySelector('#display-names-table').innerHTML = tableRowsStr;
+    });
+  }
+
+  const initRelativeTimeFormatExample = () => {
+    document.querySelector('#relative-time-transform').addEventListener('click', () => {
+      const locale = document.querySelector('#relative-time-locale').value;
+      const date = new Date(document.querySelector('#relative-time-date').value);
+      const current = new Date();
+      let value;
+      let unit;
+      if (date.getFullYear() !== current.getFullYear()) {
+        value = date.getFullYear() - current.getFullYear();
+        unit = 'year';
+      }
+      else if (date.getMonth() !== current.getMonth()) {
+        value = date.getMonth() - current.getMonth();
+        unit = 'month';
+      }
+      else if (date.getDate() !== current.getDate()) {
+        value = date.getDate() - current.getDate();
+        unit = 'day';
+      }
+      else if (date.getHours() !== current.getHours()) {
+        value = date.getHours() - current.getHours();
+        unit = 'hour';
+      }
+      else if (date.getMinutes() !== current.getMinutes()) {
+        value = date.getMinutes() - current.getMinutes();
+        unit = 'minute';
+      }
+      const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto'});
+      document.querySelector('#relative-time-transform-result').innerHTML = formatter.format(value, unit);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initCollatorExample();
+    initDateFormatExample();
+    initDisplayNamesExample();
+    initRelativeTimeFormatExample();
+  });
+</script>
+</body>
+</html>
